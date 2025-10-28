@@ -8,6 +8,8 @@ import { testConnection } from './config/database.js';
 // Import routes
 import exampleRoutes from './routes/exampleRoutes.js';
 import counterRoutes from './routes/counterRoutes.js';
+import userRoutes from './routes/userRoutes.js';
+import chatRoutes from './routes/chatRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -38,6 +40,8 @@ app.get('/', (req, res) => {
 // API routes
 app.use('/api/examples', exampleRoutes);
 app.use('/api/counter', counterRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {

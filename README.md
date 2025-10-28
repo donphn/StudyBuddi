@@ -25,12 +25,14 @@ This is a web app that allows students to connect with peers, similar to Hinge b
 
 ## Quick Start for Contributors
 
+👉 **See [SETUP_GUIDE.md](SETUP_GUIDE.md) for detailed setup instructions!**
+
 ### Prerequisites
 - Node.js (v16 or higher)
 - npm or yarn
-- MySQL (v8.0 or higher)
+- MySQL (v5.7 or higher)
 
-### Automated Setup
+### Quickest Setup
 
 **For macOS/Linux:**
 ```bash
@@ -41,6 +43,12 @@ This is a web app that allows students to connect with peers, similar to Hinge b
 ```bash
 setup.bat
 ```
+
+Both scripts will:
+- ✅ Check prerequisites
+- ✅ Install all dependencies
+- ✅ Create `.env` file
+- ✅ Show next steps
 
 ### Manual Setup
 
@@ -171,11 +179,20 @@ See [server/README.md](server/README.md) for detailed API documentation.
 ## Database Schema
 
 The application uses MySQL with the following main tables:
+- `users` - User accounts with authentication
 - `items` - Example table with CRUD operations
-- `users` - User authentication (planned)
+- `shared_counter1` & `shared_counter2` - Real-time counter storage
 - `study_sessions` - Study session tracking (planned)
 
 See [server/models/schema.sql](server/models/schema.sql) for the complete schema.
+
+### Authentication
+
+The application now includes JWT-based authentication:
+- Login/Signup endpoints at `/api/users/login` and `/api/users/signup`
+- Passwords stored in database (use bcrypt in production!)
+- JWT tokens for session management
+- Protected routes for authenticated users only
 
 ## Development Guidelines
 

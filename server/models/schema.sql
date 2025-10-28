@@ -44,6 +44,16 @@ CREATE TABLE IF NOT EXISTS shared_counter2 (
   count INT DEFAULT 0
 );
 
+-- Messages table for chat feature
+CREATE TABLE IF NOT EXISTS messages (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  username VARCHAR(50) NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Insert sample data for testing
 INSERT INTO items (name, description) VALUES
   ('Sample Item 1', 'This is a sample item for testing'),

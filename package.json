@@ -1,0 +1,46 @@
+{
+  "name": "studybuddi",
+  "version": "1.0.0",
+  "description": "WELCOME!! This is a open source repository of STUDYBUDDI made by Don Do Phan and Daniel Nguyen.",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "client": "vite",
+    "server": "nodemon server/server.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "setup": "node -e \"console.log('Run ./setup.sh (macOS/Linux) or setup.bat (Windows) to set up the project')\"",
+    "db:create": "mysql -u root -p < server/models/schema.sql",
+    "test:api": "echo 'Testing API endpoint...' && curl http://localhost:5000/api/examples"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/donphn/StudyBuddi.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/donphn/StudyBuddi/issues"
+  },
+  "homepage": "https://github.com/donphn/StudyBuddi#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "mysql2": "^3.15.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.0",
+    "concurrently": "^9.2.1",
+    "eslint": "^9.38.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "nodemon": "^3.1.10",
+    "vite": "^7.1.12"
+  }
+}

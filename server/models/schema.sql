@@ -33,8 +33,23 @@ CREATE TABLE IF NOT EXISTS study_sessions (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Shared counter table for real-time counter feature
+CREATE TABLE IF NOT EXISTS shared_counter1 (
+  id INT PRIMARY KEY DEFAULT 1,
+  count INT DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS shared_counter2 (
+  id INT PRIMARY KEY DEFAULT 1,
+  count INT DEFAULT 0
+);
+
 -- Insert sample data for testing
 INSERT INTO items (name, description) VALUES
   ('Sample Item 1', 'This is a sample item for testing'),
   ('Sample Item 2', 'Another sample item'),
   ('Sample Item 3', 'Yet another sample item');
+
+-- Initialize shared counter
+INSERT INTO shared_counter1 (id, count) VALUES (1, 0) ON DUPLICATE KEY UPDATE id=id;
+INSERT INTO shared_counter2 (id, count) VALUES (1, 0) ON DUPLICATE KEY UPDATE id=id;

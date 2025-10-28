@@ -20,28 +20,21 @@ npm run dev
 
 1. **Make sure both computers are on the same WiFi network**
 
-2. **Update the Socket.IO connection in App.jsx:**
+2. **Update the environment variable:**
 
-   On Computer 2, edit `src/App.jsx` line 6:
-   ```javascript
-   // Change from:
-   const socket = io('http://localhost:5001')
-
-   // To:
-   const socket = io('http://10.21.145.113:5001')
+   On Computer 2, update `.env` file:
+   ```
+   VITE_API_URL=http://10.21.145.128:5000
    ```
 
-   Also update the API fetch calls (lines 14, 50, 68):
+   The App.jsx automatically uses this for both Socket.IO and API calls:
    ```javascript
-   // Change from:
-   fetch('http://localhost:5001/api/counter')
-
-   // To:
-   fetch('http://10.21.145.113:5001/api/counter')
+   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+   const socket = io(API_URL)
    ```
 
 3. **Access the app on Computer 2:**
-   - Frontend: http://10.21.145.113:3000
+   - Frontend: http://10.21.145.128:3000
 
 ## Quick Test (Single Computer, Multiple Tabs)
 
@@ -56,7 +49,7 @@ You can test this immediately on one computer:
 ## How It Works
 
 ```
-Computer A          →  Server (10.21.145.113:5001)  ←  Computer B
+Computer A          →  Server (10.21.145.128:5000)  ←  Computer B
   ↓ Click button              ↓                            ↓
   ↓ POST /increment          Database                     Receives
   ↓                           Updated                      Socket.IO
@@ -87,27 +80,27 @@ Computer A          →  Server (10.21.145.113:5001)  ←  Computer B
 
 3. **Test connection from Computer 2:**
    ```bash
-   ping 10.21.145.113
-   curl http://10.21.145.113:5001/api/counter
+   ping 10.21.145.128
+   curl http://10.21.145.128:5000/api/counter/1
    ```
 
 ### Port conflicts:
 
 - Frontend uses port 3000
-- Backend uses port 5001
+- Backend uses port 5000
 - Make sure no other apps are using these ports
 
 ## Environment Variable for Production
 
 For easier configuration, you can use environment variables:
 
-Create `.env.local` in the project root:
+Update `.env` in the project root:
 ```
-VITE_API_URL=http://10.21.145.113:5001
+VITE_API_URL=http://10.21.145.128:5000
 ```
 
-Then update `src/App.jsx` to use:
+The `src/App.jsx` already uses this correctly:
 ```javascript
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const socket = io(API_URL)
 ```

@@ -231,7 +231,7 @@ ISC License
 ## Contact
 
 - Don Do Phan - [GitHub](https://github.com/donphn)
-- Daniel Nguyen
+- Daniel Nguyen - [GitHub](https://github.com/danielngy3n)
 
 Project Link: [https://github.com/donphn/StudyBuddi](https://github.com/donphn/StudyBuddi) 
 

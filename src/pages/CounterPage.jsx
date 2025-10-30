@@ -28,6 +28,7 @@ export default function CounterPage() {
       setConnected(true)
     })
 
+    // Listen for Socket.IO disconnection
     socket.on('disconnect', () => {
       console.log('Disconnected from server')
       setConnected(false)
@@ -39,6 +40,7 @@ export default function CounterPage() {
       setCount1(data.count)
     })
 
+    // Listen for counter updates from other clients
     socket.on('counterUpdate2', (data) => {
       console.log('Counter 2 updated:', data.count)
       setCount2(data.count)

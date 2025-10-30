@@ -8,7 +8,7 @@ Welcome to the StudyBuddi project! This guide makes it super easy for you (and y
 
 ```bash
 git clone https://github.com/donphn/StudyBuddi.git
-cd StudyBuddi
+cd StudyBuddiasdasdasdasd
 ```
 
 ### Step 2: Run Setup Script

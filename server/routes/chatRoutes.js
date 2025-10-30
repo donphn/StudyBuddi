@@ -1,6 +1,7 @@
 import express from 'express';
 import { getMessages, sendMessage } from '../controllers/chatController.js';
 
+// Create a new router instance
 const router = express.Router();
 
 // Get all messages

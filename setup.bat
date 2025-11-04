@@ -94,6 +94,17 @@ echo   npm run client  - Start only frontend (port 3000)
 echo   npm run server  - Start only backend (port 5000)
 echo   npm run build   - Build for production
 echo.
+echo Features:
+echo   - Real-time counter synchronization with Socket.IO
+echo   - Live chat messaging
+echo   - WebRTC peer-to-peer video matching
+echo   - Automatic user matchmaking
+echo.
+echo WebRTC Requirements:
+echo   - HTTPS or localhost (required for camera/microphone access)
+echo   - Modern browser with WebRTC support (Chrome, Firefox, Safari, Edge)
+echo   - Microphone and camera permissions
+echo.
 echo Happy coding!
 echo.
 pause

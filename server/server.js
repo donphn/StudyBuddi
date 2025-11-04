@@ -43,12 +43,105 @@ app.use('/api/counter', counterRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/chat', chatRoutes);
 
+// WebRTC Signaling - Track users looking for matches
+const matchmakingQueue = [];
+const userSessions = new Map(); // Map to store user info and socket info
+
 // Socket.IO connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
   socket.on('disconnect', () => {
     console.log('Client disconnected:', socket.id);
+
+    // Remove from matchmaking queue if disconnected while waiting
+    const queueIndex = matchmakingQueue.findIndex(u => u.socketId === socket.id);
+    if (queueIndex !== -1) {
+      matchmakingQueue.splice(queueIndex, 1);
+      console.log('User removed from matchmaking queue');
+    }
+
+    // Clean up user session
+    userSessions.delete(socket.id);
+  });
+
+  // Handle user joining matchmaking
+  socket.on('joinMatch', (userInfo) => {
+    console.log('User joining match:', userInfo.username, socket.id);
+
+    const user = {
+      socketId: socket.id,
+      username: userInfo.username,
+      userId: userInfo.userId
+    };
+
+    // Store user session
+    userSessions.set(socket.id, user);
+
+    // Check if there's another user waiting
+    if (matchmakingQueue.length > 0) {
+      // Match found!
+      const matchedUser = matchmakingQueue.shift();
+
+      console.log('Match found:', matchedUser.username, 'with', userInfo.username);
+
+      // Notify both users
+      socket.emit('matchFound', {
+        peerId: matchedUser.socketId,
+        peerUsername: matchedUser.username
+      });
+
+      io.to(matchedUser.socketId).emit('matchFound', {
+        peerId: socket.id,
+        peerUsername: userInfo.username
+      });
+    } else {
+      // Add to queue and wait
+      matchmakingQueue.push(user);
+      socket.emit('waitingForMatch');
+    }
+  });
+
+  // Handle user canceling match
+  socket.on('cancelMatch', () => {
+    console.log('User canceling match:', socket.id);
+
+    const queueIndex = matchmakingQueue.findIndex(u => u.socketId === socket.id);
+    if (queueIndex !== -1) {
+      matchmakingQueue.splice(queueIndex, 1);
+      console.log('User removed from matchmaking queue');
+    }
+
+    socket.emit('matchCanceled');
+  });
+
+  // Handle WebRTC signaling - offer
+  socket.on('sendOffer', (data) => {
+    const { peerId, offer } = data;
+    console.log('Sending offer to:', peerId);
+    io.to(peerId).emit('receiveOffer', {
+      offer,
+      fromId: socket.id
+    });
+  });
+
+  // Handle WebRTC signaling - answer
+  socket.on('sendAnswer', (data) => {
+    const { peerId, answer } = data;
+    console.log('Sending answer to:', peerId);
+    io.to(peerId).emit('receiveAnswer', {
+      answer,
+      fromId: socket.id
+    });
+  });
+
+  // Handle WebRTC signaling - ICE candidates
+  socket.on('sendIceCandidate', (data) => {
+    const { peerId, candidate } = data;
+    io.to(peerId).emit('receiveIceCandidate', {
+      candidate,
+      fromId: socket.id
+    });
   });
 });
 

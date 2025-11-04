@@ -61,3 +61,62 @@ export const sendMessage = async (req, res) => {
     });
   }
 };
+
+// Delete a message
+export const deleteMessage = async (req, res) => {
+  try {
+    const { messageId } = req.params;
+    const { user_id } = req.body;
+
+    if (!messageId || !user_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: messageId, user_id'
+      });
+    }
+
+    // Check if the message exists and belongs to the user
+    const messageResult = await query(
+      'SELECT id, user_id FROM messages WHERE id = ?',
+      [messageId]
+    );
+
+    if (messageResult.length === 0) {
+      return res.status(404).json({
+        success: false,
+        error: 'Message not found'
+      });
+    }
+
+    // Check if the user is the message owner
+    if (messageResult[0].user_id !== user_id) {
+      return res.status(403).json({
+        success: false,
+        error: 'You can only delete your own messages'
+      });
+    }
+
+    // Delete the message
+    await query(
+      'DELETE FROM messages WHERE id = ?',
+      [messageId]
+    );
+
+    // Emit deletion event to all connected clients via Socket.IO
+    const io = req.app.get('io');
+    io.emit('messageDeleted', {
+      messageId: parseInt(messageId)
+    });
+
+    res.json({
+      success: true,
+      message: 'Message deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting message:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete message'
+    });
+  }
+};

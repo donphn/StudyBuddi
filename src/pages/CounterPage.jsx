@@ -12,6 +12,8 @@ export default function CounterPage() {
   const [connected, setConnected] = useState(false)
   const [messages, setMessages] = useState([])
   const [messageInput, setMessageInput] = useState('')
+  const [isMatchingEnabled, setIsMatchingEnabled] = useState(false)
+  const [isWaitingForMatch, setIsWaitingForMatch] = useState(false)
   const socketRef = useRef(null)
   const messagesEndRef = useRef(null)
   const navigate = useNavigate()
@@ -48,6 +50,37 @@ export default function CounterPage() {
     socket.on('newMessage', (message) => {
       console.log('New message received:', message)
       setMessages(prev => [...prev, message])
+    })
+
+    // Listen for message deletions from other clients
+    socket.on('messageDeleted', (data) => {
+      console.log('Message deleted:', data.messageId)
+      setMessages(prev => prev.filter(msg => msg.id !== data.messageId))
+    })
+
+    // Listen for match found
+    socket.on('matchFound', (data) => {
+      console.log('Match found with:', data.peerUsername)
+      setIsWaitingForMatch(false)
+      // Store match info and navigate to match page
+      localStorage.setItem('matchInfo', JSON.stringify({
+        peerId: data.peerId,
+        peerUsername: data.peerUsername,
+        socketId: socket.id
+      }))
+      navigate('/match')
+    })
+
+    // Listen for waiting for match
+    socket.on('waitingForMatch', () => {
+      console.log('Waiting for match...')
+      setIsWaitingForMatch(true)
+    })
+
+    // Listen for match canceled
+    socket.on('matchCanceled', () => {
+      console.log('Match canceled')
+      setIsWaitingForMatch(false)
     })
 
     // Fetch initial messages from database
@@ -87,6 +120,10 @@ export default function CounterPage() {
       socket.off('counterUpdate1')
       socket.off('counterUpdate2')
       socket.off('newMessage')
+      socket.off('messageDeleted')
+      socket.off('matchFound')
+      socket.off('waitingForMatch')
+      socket.off('matchCanceled')
       socket.disconnect()
     }
   }, [])
@@ -202,6 +239,45 @@ export default function CounterPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  const handleDeleteMessage = async (messageId) => {
+    try {
+      const response = await fetch(`${API_URL}/api/chat/${messageId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          user_id: user.id
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        // Message will be removed via Socket.IO event
+        console.log('Message deleted successfully')
+      } else {
+        console.error('Error deleting message:', data.error)
+      }
+    } catch (err) {
+      console.error('Error deleting message:', err)
+    }
+  }
+
+  const handleMatchClick = () => {
+    if (isWaitingForMatch) {
+      // Cancel match
+      socketRef.current.emit('cancelMatch')
+      setIsWaitingForMatch(false)
+    } else {
+      // Start looking for match
+      socketRef.current.emit('joinMatch', {
+        username: user.username,
+        userId: user.id
+      })
+    }
+  }
+
   const handleLogout = () => {
     if (socketRef.current) {
       socketRef.current.disconnect()
@@ -239,6 +315,38 @@ export default function CounterPage() {
           color: '#888'
         }}>
           Server: {API_URL}
+        </div>
+
+        {/* Match Section */}
+        <div style={{
+          marginBottom: '20px',
+          padding: '15px',
+          backgroundColor: '#e3f2fd',
+          borderRadius: '8px',
+          border: '1px solid #2196F3',
+          textAlign: 'center'
+        }}>
+          <button
+            onClick={handleMatchClick}
+            disabled={!connected}
+            style={{
+              fontSize: '16px',
+              padding: '12px 30px',
+              backgroundColor: isWaitingForMatch ? '#ff9800' : '#2196F3',
+              color: 'white',
+              border: 'none',
+              borderRadius: '5px',
+              cursor: connected ? 'pointer' : 'not-allowed',
+              opacity: connected ? 1 : 0.5
+            }}
+          >
+            {isWaitingForMatch ? 'Cancel Match' : 'Find Match'}
+          </button>
+          {isWaitingForMatch && (
+            <p style={{ marginTop: '10px', color: '#ff9800', fontSize: '14px', fontWeight: 'bold' }}>
+              Finding Match...
+            </p>
+          )}
         </div>
 
         <div className="card">
@@ -327,7 +435,9 @@ export default function CounterPage() {
                     style={{
                       marginBottom: '6px',
                       display: 'flex',
-                      justifyContent: isOwnMessage ? 'flex-end' : 'flex-start'
+                      justifyContent: isOwnMessage ? 'flex-end' : 'flex-start',
+                      alignItems: 'flex-end',
+                      gap: '6px'
                     }}
                   >
                     <div
@@ -351,6 +461,23 @@ export default function CounterPage() {
                         {new Date(msg.created_at).toLocaleTimeString()}
                       </div>
                     </div>
+                    {isOwnMessage && (
+                      <button
+                        onClick={() => handleDeleteMessage(msg.id)}
+                        style={{
+                          backgroundColor: '#f44336',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        Delete
+                      </button>
+                    )}
                   </div>
                 )
               })

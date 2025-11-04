@@ -1,5 +1,5 @@
 import express from 'express';
-import { getMessages, sendMessage } from '../controllers/chatController.js';
+import { getMessages, sendMessage, deleteMessage } from '../controllers/chatController.js';
 
 const router = express.Router();
 
@@ -8,5 +8,8 @@ router.get('/', getMessages);
 
 // Send a new message
 router.post('/', sendMessage);
+
+// Delete a message
+router.delete('/:messageId', deleteMessage);
 
 export default router;

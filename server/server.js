@@ -2,8 +2,16 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
+import { createServer as createHttpsServer } from 'https';
 import { Server } from 'socket.io';
 import { testConnection } from './config/database.js';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get __dirname for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Import routes
 import exampleRoutes from './routes/exampleRoutes.js';
@@ -15,8 +23,31 @@ import chatRoutes from './routes/chatRoutes.js';
 dotenv.config();
 
 const app = express();
-const httpServer = createServer(app);
-const io = new Server(httpServer, {
+
+// Check if HTTPS should be used
+const useHttps = process.env.VITE_USE_HTTPS === 'true';
+const certPath = path.join(__dirname, '..', 'cert.crt');
+const keyPath = path.join(__dirname, '..', 'cert.key');
+
+let server;
+if (useHttps && fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+  // Use HTTPS for cross-device camera access
+  const options = {
+    cert: fs.readFileSync(certPath),
+    key: fs.readFileSync(keyPath)
+  };
+  server = createHttpsServer(options, app);
+  console.log('Using HTTPS server');
+} else {
+  // Use HTTP server
+  server = createServer(app);
+  if (useHttps) {
+    console.log('HTTPS requested but certificates not found. Using HTTP instead.');
+    console.log('Run: npm run generate-certs');
+  }
+}
+
+const io = new Server(server, {
   cors: {
     origin: '*',
     methods: ['GET', 'POST']
@@ -163,9 +194,10 @@ app.use((req, res) => {
 });
 
 // Start server with Socket.IO
-httpServer.listen(PORT, '0.0.0.0', () => {
+server.listen(PORT, '0.0.0.0', () => {
+  const protocol = useHttps ? 'https' : 'http';
   console.log(`Server is running on port ${PORT}`);
-  console.log(`API available at http://localhost:${PORT}/api`);
+  console.log(`API available at ${protocol}://localhost:${PORT}/api`);
   console.log(`Socket.IO enabled for real-time updates`);
 });
 

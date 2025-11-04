@@ -7,12 +7,15 @@
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "client": "vite",
     "server": "nodemon server/server.js",
+    "dev:https": "VITE_USE_HTTPS=true concurrently \"npm run server\" \"npm run client\"",
+    "dev:https:win": "set VITE_USE_HTTPS=true && concurrently \"npm run server\" \"npm run client\"",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "setup": "node -e \"console.log('Run ./setup.sh (macOS/Linux) or setup.bat (Windows) to set up the project')\"",
     "db:create": "mysql -u root -p < server/models/schema.sql",
-    "test:api": "echo 'Testing API endpoint...' && curl http://localhost:5000/api/examples"
+    "test:api": "echo 'Testing API endpoint...' && curl http://localhost:5000/api/examples",
+    "generate-certs": "node generate-certs.js"
   },
   "repository": {
     "type": "git",
@@ -45,6 +48,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "nodemon": "^3.1.10",
+    "selfsigned": "^2.4.1",
     "vite": "^7.1.12"
   }
 }

@@ -3,26 +3,34 @@ import { io } from 'socket.io-client'
 import { useNavigate } from 'react-router-dom'
 import '../App.css'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+// Get API URL from environment or auto-detect based on current protocol
+const API_URL = import.meta.env.VITE_API_URL || (() => {
+  if (typeof window !== 'undefined') {
+    // Auto-detect protocol based on current page
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http'
+    const host = window.location.hostname
+    return `${protocol}://${host}:5000`
+  }
+  return 'http://localhost:5000'
+})()
 
 export default function MatchPage() {
   const navigate = useNavigate()
   const socketRef = useRef(null)
   const peerConnectionRef = useRef(null)
   const localStreamRef = useRef(null)
-  const remoteStreamRef = useRef(null)
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
 
   const [matchInfo, setMatchInfo] = useState(null)
   const [connectionStatus, setConnectionStatus] = useState('connecting')
-  const [isInitiator, setIsInitiator] = useState(false)
+  const [error, setError] = useState('')
   const user = JSON.parse(localStorage.getItem('user') || '{}')
 
-  // ICE servers configuration (Safari compatible)
-  const iceServers = {
+  const ICE_SERVERS = {
     iceServers: [
-      { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
       { urls: 'stun:stun3.l.google.com:19302' },
       { urls: 'stun:stun4.l.google.com:19302' }
@@ -30,169 +38,139 @@ export default function MatchPage() {
   }
 
   useEffect(() => {
+    console.log('MatchPage mounted')
+
     // Get match info from localStorage
     const stored = localStorage.getItem('matchInfo')
     if (!stored) {
+      console.log('No match info found, redirecting to counter')
       navigate('/counter')
       return
     }
 
-    const info = JSON.parse(stored)
-    setMatchInfo(info)
+    try {
+      const info = JSON.parse(stored)
+      console.log('Match info:', info)
+      setMatchInfo(info)
 
-    // Determine if this user is the initiator (first to join, lower socket ID)
-    setIsInitiator(info.socketId < info.peerId)
+      // Create socket connection
+      const socket = io(API_URL)
+      socketRef.current = socket
 
-    // Initialize socket and get video stream
-    const socket = io(API_URL)
-    socketRef.current = socket
-
-    // Get local video stream (Safari compatible constraints)
-    console.log('Requesting media devices...')
-    navigator.mediaDevices
-      .getUserMedia({
-        video: {
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: true
+      socket.on('connect', () => {
+        console.log('Socket connected:', socket.id)
       })
-      .then(stream => {
-        console.log('Media stream obtained:', stream)
-        localStreamRef.current = stream
-        if (localVideoRef.current) {
-          console.log('Setting local video srcObject')
-          localVideoRef.current.srcObject = stream
-          // Safari requires explicit playback handling
-          localVideoRef.current.play().catch(err => console.warn('Autoplay issue:', err))
+
+      socket.on('error', (error) => {
+        console.error('Socket error:', error)
+        setError('Socket error: ' + error)
+      })
+
+      // Setup WebRTC signaling handlers
+      socket.on('receiveOffer', (data) => handleReceiveOffer(data))
+      socket.on('receiveAnswer', (data) => handleReceiveAnswer(data))
+      socket.on('receiveIceCandidate', (data) => handleReceiveIceCandidate(data))
+
+      // Get media stream and setup peer connection
+      setupMedia(info, socket)
+
+      return () => {
+        socket.off('receiveOffer')
+        socket.off('receiveAnswer')
+        socket.off('receiveIceCandidate')
+        socket.disconnect()
+
+        if (localStreamRef.current) {
+          localStreamRef.current.getTracks().forEach(track => track.stop())
         }
 
-        // Create peer connection
-        console.log('Creating peer connection...')
-        createPeerConnection(stream, info, socket)
-      })
-      .catch(err => {
-        console.error('Error accessing media devices:', err)
-        console.error('Error details:', err.name, err.message)
-        alert('Camera/microphone access denied. Please allow access in browser settings.\n\nError: ' + err.message)
-        setConnectionStatus('error')
-      })
-
-    // Socket event listeners for WebRTC signaling
-    // Note: These handlers are defined below but referenced here
-    const onReceiveOffer = (data) => {
-      console.log('Received offer from:', data.fromId)
-      const peerConnection = peerConnectionRef.current
-      if (!peerConnection) return
-      peerConnection
-        .setRemoteDescription(data.offer)
-        .then(() => {
-          console.log('Creating answer')
-          return peerConnection.createAnswer()
-        })
-        .then(answer => {
-          return peerConnection.setLocalDescription(answer)
-        })
-        .then(() => {
-          socket.emit('sendAnswer', {
-            peerId: data.fromId,
-            answer: peerConnection.localDescription
-          })
-        })
-        .catch(err => {
-          console.error('Error handling offer:', err)
-          setConnectionStatus('error')
-        })
-    }
-
-    const onReceiveAnswer = (data) => {
-      console.log('Received answer from:', data.fromId)
-      const peerConnection = peerConnectionRef.current
-      if (!peerConnection) return
-      peerConnection
-        .setRemoteDescription(data.answer)
-        .catch(err => {
-          console.error('Error handling answer:', err)
-          setConnectionStatus('error')
-        })
-    }
-
-    const onReceiveIceCandidate = (data) => {
-      console.log('Received ICE candidate from:', data.fromId)
-      const peerConnection = peerConnectionRef.current
-      if (!peerConnection) return
-      if (data.candidate) {
-        peerConnection
-          .addIceCandidate(data.candidate)
-          .catch(err => {
-            console.error('Error adding ICE candidate:', err)
-          })
+        if (peerConnectionRef.current) {
+          peerConnectionRef.current.close()
+        }
       }
-    }
-
-    socket.on('receiveOffer', onReceiveOffer)
-    socket.on('receiveAnswer', onReceiveAnswer)
-    socket.on('receiveIceCandidate', onReceiveIceCandidate)
-
-    // Cleanup on unmount
-    return () => {
-      socket.off('receiveOffer', onReceiveOffer)
-      socket.off('receiveAnswer', onReceiveAnswer)
-      socket.off('receiveIceCandidate', onReceiveIceCandidate)
-      socket.disconnect()
-
-      // Stop all tracks
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop())
-      }
-
-      // Close peer connection
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close()
-      }
+    } catch (err) {
+      console.error('Error in MatchPage setup:', err)
+      setError('Error: ' + err.message)
     }
   }, [navigate])
 
-  const createPeerConnection = (localStream, info, socket) => {
+  const setupMedia = async (info, socket) => {
+    let localStream = null;
+
     try {
-      console.log('createPeerConnection called with info:', info)
-      console.log('ICE Servers config:', iceServers)
+      console.log('Requesting media devices...')
+      console.log('Current URL:', window.location.href)
 
-      const peerConnection = new RTCPeerConnection(iceServers)
-      console.log('RTCPeerConnection created')
+      // Try to get media stream, but allow continuing without it
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        try {
+          localStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+            audio: true
+          })
 
+          console.log('Media stream obtained')
+          localStreamRef.current = localStream
+
+          if (localVideoRef.current) {
+            localVideoRef.current.srcObject = localStream
+          }
+        } catch (mediaErr) {
+          console.warn('Could not access camera/microphone:', mediaErr.message)
+          console.warn('Proceeding with WebRTC connection without video...')
+          setError(`Camera access: ${mediaErr.message}. WebRTC connection may still work without video.`)
+          // Continue without media stream - can still establish peer connection for data
+        }
+      } else {
+        console.warn('MediaDevices not available')
+        setError('MediaDevices not available. Using HTTP IP? Try http://localhost:3000 instead.')
+      }
+
+      // Setup peer connection even if media stream failed
+      setupPeerConnection(info, localStream, socket)
+
+    } catch (err) {
+      console.error('Error in setupMedia:', err)
+      setError('Setup error: ' + err.message)
+      setConnectionStatus('error')
+    }
+  }
+
+  const setupPeerConnection = (info, localStream, socket) => {
+    try {
+      console.log('Creating RTCPeerConnection')
+      const peerConnection = new RTCPeerConnection(ICE_SERVERS)
       peerConnectionRef.current = peerConnection
 
-      // Add local tracks to peer connection
-      console.log('Adding local tracks...')
-      localStream.getTracks().forEach(track => {
-        console.log('Adding track:', track.kind)
-        peerConnection.addTrack(track, localStream)
-      })
+      // Add local tracks (if available)
+      if (localStream) {
+        localStream.getTracks().forEach(track => {
+          console.log('Adding track:', track.kind)
+          peerConnection.addTrack(track, localStream)
+        })
+      } else {
+        console.log('No local stream available (camera access blocked?)')
+      }
 
-      // Handle remote stream
+      // Handle remote tracks
       peerConnection.ontrack = (event) => {
         console.log('Received remote track:', event.track.kind)
         if (remoteVideoRef.current && event.streams[0]) {
-          console.log('Setting remote video srcObject')
           remoteVideoRef.current.srcObject = event.streams[0]
-          remoteStreamRef.current = event.streams[0]
           setConnectionStatus('connected')
         }
       }
 
-      // Handle connection state changes
+      // Handle connection state
       peerConnection.onconnectionstatechange = () => {
-        console.log('Connection state changed:', peerConnection.connectionState)
+        console.log('Connection state:', peerConnection.connectionState)
         switch (peerConnection.connectionState) {
           case 'connected':
-            console.log('Connection established!')
             setConnectionStatus('connected')
             break
-          case 'disconnected':
           case 'failed':
+          case 'disconnected':
           case 'closed':
-            console.log('Connection closed/failed')
             handleEndConnection()
             break
           default:
@@ -203,7 +181,7 @@ export default function MatchPage() {
       // Handle ICE candidates
       peerConnection.onicecandidate = (event) => {
         if (event.candidate) {
-          console.log('Sending ICE candidate:', event.candidate)
+          console.log('Sending ICE candidate')
           socket.emit('sendIceCandidate', {
             peerId: info.peerId,
             candidate: event.candidate
@@ -211,57 +189,113 @@ export default function MatchPage() {
         }
       }
 
-      // If this user is initiator, create and send offer
-      if (info.socketId < info.peerId) {
-        console.log('This user is initiator, creating offer')
-        peerConnection
-          .createOffer()
-          .then(offer => {
-            console.log('Offer created, setting local description')
-            return peerConnection.setLocalDescription(offer)
-          })
-          .then(() => {
-            console.log('Local description set, sending offer to peer')
-            socket.emit('sendOffer', {
-              peerId: info.peerId,
-              offer: peerConnection.localDescription
-            })
-          })
-          .catch(err => {
-            console.error('Error creating offer:', err)
-            setConnectionStatus('error')
-          })
+      // Determine if this user initiates offer
+      const shouldInitiate = info.socketId < info.peerId
+      console.log('Should initiate:', shouldInitiate, 'socketId:', info.socketId, 'peerId:', info.peerId)
+
+      if (shouldInitiate) {
+        createAndSendOffer(peerConnection, info, socket)
       } else {
-        console.log('This user is NOT initiator, waiting for offer')
+        console.log('Waiting for offer from peer')
       }
     } catch (err) {
-      console.error('Error creating peer connection:', err)
-      console.error('Stack:', err.stack)
+      console.error('Error setting up peer connection:', err)
+      setError('Peer connection error: ' + err.message)
       setConnectionStatus('error')
     }
   }
 
+  const createAndSendOffer = async (peerConnection, info, socket) => {
+    try {
+      console.log('Creating offer')
+      const offer = await peerConnection.createOffer()
+      await peerConnection.setLocalDescription(offer)
+
+      console.log('Sending offer to peer')
+      socket.emit('sendOffer', {
+        peerId: info.peerId,
+        offer: peerConnection.localDescription
+      })
+    } catch (err) {
+      console.error('Error creating offer:', err)
+      setError('Offer error: ' + err.message)
+      setConnectionStatus('error')
+    }
+  }
+
+  const handleReceiveOffer = async (data) => {
+    try {
+      console.log('Received offer')
+      const peerConnection = peerConnectionRef.current
+      if (!peerConnection) {
+        console.error('Peer connection not initialized')
+        return
+      }
+
+      await peerConnection.setRemoteDescription(data.offer)
+      const answer = await peerConnection.createAnswer()
+      await peerConnection.setLocalDescription(answer)
+
+      console.log('Sending answer')
+      socketRef.current.emit('sendAnswer', {
+        peerId: data.fromId,
+        answer: peerConnection.localDescription
+      })
+    } catch (err) {
+      console.error('Error handling offer:', err)
+      setError('Answer error: ' + err.message)
+    }
+  }
+
+  const handleReceiveAnswer = async (data) => {
+    try {
+      console.log('Received answer')
+      const peerConnection = peerConnectionRef.current
+      if (!peerConnection) {
+        console.error('Peer connection not initialized')
+        return
+      }
+
+      await peerConnection.setRemoteDescription(data.answer)
+    } catch (err) {
+      console.error('Error handling answer:', err)
+      setError('Answer handling error: ' + err.message)
+    }
+  }
+
+  const handleReceiveIceCandidate = async (data) => {
+    try {
+      const peerConnection = peerConnectionRef.current
+      if (!peerConnection || !data.candidate) return
+
+      await peerConnection.addIceCandidate(data.candidate)
+    } catch (err) {
+      console.error('Error adding ICE candidate:', err)
+    }
+  }
+
   const handleEndConnection = () => {
-    // Stop all tracks
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach(track => track.stop())
     }
 
-    // Close peer connection
     if (peerConnectionRef.current) {
       peerConnectionRef.current.close()
     }
 
-    // Clear match info and redirect
     localStorage.removeItem('matchInfo')
     navigate('/counter')
+  }
+
+  if (!matchInfo) {
+    return <div style={{ padding: '20px', textAlign: 'center' }}>Loading match info...</div>
   }
 
   return (
     <div className="App">
       <header className="App-header">
         <h1>Video Match</h1>
-        <p>Connected with {matchInfo?.peerUsername}</p>
+        <p>Connected with {matchInfo.peerUsername}</p>
 
         <div
           style={{
@@ -285,7 +319,12 @@ export default function MatchPage() {
               : '🔴 Connection Error'}
         </div>
 
-        {/* Video Container */}
+        {error && (
+          <div style={{ marginBottom: '20px', padding: '10px', backgroundColor: '#f44336', color: 'white', borderRadius: '5px' }}>
+            {error}
+          </div>
+        )}
+
         <div
           style={{
             display: 'grid',
@@ -296,7 +335,6 @@ export default function MatchPage() {
             marginRight: '1in'
           }}
         >
-          {/* Local Video */}
           <div
             style={{
               border: '2px solid #2196F3',
@@ -329,7 +367,6 @@ export default function MatchPage() {
             </div>
           </div>
 
-          {/* Remote Video */}
           <div
             style={{
               border: '2px solid #4CAF50',
@@ -357,12 +394,11 @@ export default function MatchPage() {
                 fontWeight: 'bold'
               }}
             >
-              {matchInfo?.peerUsername || 'Connecting...'}
+              {matchInfo.peerUsername}
             </div>
           </div>
         </div>
 
-        {/* End Connection Button */}
         <button
           onClick={handleEndConnection}
           style={{

@@ -55,6 +55,21 @@ echo [OK] Dependencies installed successfully
 
 echo.
 echo ======================================
+echo Generating HTTPS certificates...
+echo ======================================
+echo For cross-device WebRTC testing with camera access...
+echo.
+call node generate-certs.js
+
+if %ERRORLEVEL% NEQ 0 (
+    echo [WARNING] Failed to generate certificates (optional)
+    echo You can still use HTTP with localhost
+) else (
+    echo [OK] Certificates generated successfully
+)
+
+echo.
+echo ======================================
 echo Setting up environment variables...
 echo ======================================
 
@@ -89,10 +104,12 @@ echo   2. Create the database: mysql -u root -p ^< server/models/schema.sql
 echo   3. Start development: npm run dev
 echo.
 echo Available commands:
-echo   npm run dev     - Start both frontend and backend
-echo   npm run client  - Start only frontend (port 3000)
-echo   npm run server  - Start only backend (port 5000)
-echo   npm run build   - Build for production
+echo   npm run dev           - Start both frontend and backend (HTTP)
+echo   npm run dev:https:win - Start with HTTPS (cross-device testing)
+echo   npm run client        - Start only frontend (port 3000)
+echo   npm run server        - Start only backend (port 5000)
+echo   npm run build         - Build for production
+echo   npm run generate-certs - Generate HTTPS certificates
 echo.
 echo Features:
 echo   - Real-time counter synchronization with Socket.IO

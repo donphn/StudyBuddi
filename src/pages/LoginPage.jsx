@@ -2,8 +2,16 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import '../styles/AuthPages.css'
 
-// Use API URL from environment or default to localhost
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+// Get API URL from environment or auto-detect based on current protocol
+const API_URL = import.meta.env.VITE_API_URL || (() => {
+  if (typeof window !== 'undefined') {
+    // Auto-detect protocol based on current page
+    const protocol = window.location.protocol === 'https:' ? 'https' : 'http'
+    const host = window.location.hostname
+    return `${protocol}://${host}:5000`
+  }
+  return 'http://localhost:5000'
+})()
 
 export default function LoginPage() {
   const [username, setUsername] = useState('')
